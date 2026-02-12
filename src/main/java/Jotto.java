@@ -1,6 +1,8 @@
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Random;
 import java.util.Scanner;
 
 /**
@@ -24,7 +26,28 @@ public class Jotto {
     }
 
     public boolean pickWord() {
+        if (wordList.isEmpty()) {
+            System.out.println("Couldn't open " + filename);
+            return false;
+        }
 
+        if (playWords.size() >= wordList.size()) {
+            System.out.println("You've guessed them all!");
+            return false;
+        }
+
+        Random rand = new Random();
+        String possibleWord = wordList.get(rand.nextInt(wordList.size()));
+
+        if (playWords.contains(possibleWord)) {
+            return pickWord();
+        }
+
+        setCurrentWord(possibleWord);
+        if (DEBUG) {
+            System.out.println(currentWord);
+        }
+        return true;
     }
 
     public String showWordList() {
@@ -59,12 +82,16 @@ public class Jotto {
         return playGuesses;
     }
 
-    public void playerGuessScores(ArrayList<String> arrayList) {
-
+    public void playerGuessScores(ArrayList<String> guesses) {
+        System.out.println("Guess\t\tScore\n");
+        for (String g : guesses) {
+            int s = getLetterCount(g);
+            System.out.println(g + "\t\t" + s);
+        }
     }
 
     public void setCurrentWord(String str) {
-
+        this.currentWord = str;
     }
 
     public ArrayList<String> readWords() {
@@ -138,18 +165,96 @@ public class Jotto {
         int score = WORD_SIZE + 1;
         String wordGuess;
 
+        while (true) {
+            System.out.println("Current Score: " + score);
+            System.out.print("What is your guess (q to quit): ");
+            wordGuess = scan.nextLine().trim().toLowerCase();
+
+            if (wordGuess.equals("q")) {
+                score = Math.min(0, score);
+                break;
+            }
+
+            if (wordGuess.length() != WORD_SIZE) {
+                System.out.println("Word must be " + WORD_SIZE + " characters (" + wordGuess +
+                        " is " + wordGuess.length() + ")");
+                continue;
+            }
+
+            addPlayerGuess(wordGuess);
+
+            if (wordGuess.equals(currentWord)) {
+                System.out.println("DINGDINGDING!!! the word was " + currentWord);
+                currentGuesses.add(wordGuess);
+                playerGuessScores(currentGuesses);
+                return score;
+            }
+
+            if (currentGuesses.contains(wordGuess)) {
+                System.out.println("\"" + wordGuess + "\" had already been entered.");
+                continue;
+            }
+
+            currentGuesses.add(wordGuess);
+            if (letterCount != WORD_SIZE) {
+                System.out.println(wordGuess + " has a Jotto score of " + letterCount);
+                playerGuessScores(currentGuesses);
+            } else {
+                System.out.println("That word is an anagram.");
+                playerGuessScores(currentGuesses);
+            }
+
+            score--;
+        }
+
+        if (!currentGuesses.isEmpty()) {
+            System.out.println("The word was " + currentWord);
+            if (!currentGuesses.isEmpty()) {
+                playerGuessScores(currentGuesses);
+            }
+        }
+
+        return score;
     }
 
     public ArrayList<String> getPlayedWords() {
-
+        return playWords;
     }
 
     public String getCurrentWord() {
-
+        return currentWord;
     }
 
-    public int getLetterCount(String str) {
+    public int getLetterCount(String wordGuess) {
+        if (wordGuess.equals(currentWord)) {
+            return WORD_SIZE;
+        }
 
+        int count = 0;
+
+        ArrayList<Character> uniqueInWord = new ArrayList<>();
+        for (int i = 0; i < currentWord.length(); i++) {
+            char c = currentWord.charAt(i);
+            if (!uniqueInWord.contains(c)) {
+                uniqueInWord.add(c);
+            }
+        }
+
+        ArrayList<Character> usedInGuessedWord = new ArrayList<>();
+        for (int i = 0; i < wordGuess.length(); i++) {
+            char c = wordGuess.charAt(i);
+
+            if (usedInGuessedWord.contains(c)) {
+                continue;
+            }
+            usedInGuessedWord.add(c);
+
+            if (uniqueInWord.contains(c)) {
+                uniqueInWord.remove(c);
+                count++;
+            }
+        }
+        return count;
     }
 
     public String showPlayedWords() {
@@ -159,18 +264,37 @@ public class Jotto {
 
         StringBuilder sb = new StringBuilder();
         sb.append("Current list of played words:\n");
-        for (String w : playWords) {
-            sb.append(w).append("\n");
+        ArrayList<String> words = getPlayedWords();
+        for (int i = 0; i < words.size(); i++) {
+            sb.append(i).append("\n");
         }
         return sb.toString();
     }
 
-    public boolean addPlayerGuess(String str) {
-
+    public boolean addPlayerGuess(String wordGuess) {
+        if (!playGuesses.contains(wordGuess)) {
+            playGuesses.add(wordGuess);
+            return true;
+        }
+        return false;
     }
 
     public void updateWordList() {
-
+        try (FileWriter fw = new FileWriter(filename)) {
+            for (String g : playGuesses) {
+                if (g != null) {
+                    String w = g.trim().toLowerCase();
+                    if (!w.isEmpty() && w.length() == WORD_SIZE && !wordList.contains(w)) {
+                        wordList.add(w);
+                    }
+                }
+            }
+            for (String w : wordList) {
+                fw.write(w + System.lineSeparator());
+            }
+        } catch (IOException e) {
+            System.out.println("Couldn't open " + filename);
+        }
     }
 
     public int getScore() {
